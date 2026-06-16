@@ -15,6 +15,7 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+  output: 'standalone',
   typedRoutes: false,
   serverExternalPackages: [],
 };
