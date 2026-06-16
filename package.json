@@ -1,0 +1,26 @@
+{
+  "name": "resumepilot-ai",
+  "version": "1.0.0",
+  "private": true,
+  "description": "AI-driven resume optimization platform",
+  "scripts": {
+    "dev": "turbo dev",
+    "build": "turbo build",
+    "start": "turbo start",
+    "lint": "turbo lint",
+    "type-check": "turbo type-check",
+    "docker:dev": "docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d",
+    "docker:dev:build": "docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build",
+    "docker:dev:down": "docker compose -f docker-compose.yml -f docker-compose.dev.yml down",
+    "docker:prod": "docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d",
+    "docker:prod:build": "docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build",
+    "db:migrate": "cd apps/api && npx prisma migrate dev",
+    "db:seed": "cd apps/api && npx prisma db seed",
+    "db:studio": "cd apps/api && npx prisma studio"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "packageManager": "pnpm@9.0.0"
+}

@@ -1,0 +1,37 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build output
+dist/
+.next/
+*.tsbuildinfo
+
+# Environment (contains real API keys — NEVER commit)
+.env
+.env.local
+.env.production.local
+apps/api/.env
+apps/web/.env.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Testing
+coverage/
+
+# Docker
+docker/ssl/
+
+# MinIO data
+minio_data/
+
+# Claude
+.claude/

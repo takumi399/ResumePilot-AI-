@@ -1,0 +1,116 @@
+# ============================================================================
+# ResumePilot AI — 生产环境覆盖
+# ============================================================================
+# 使用方式: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# 与开发环境的关键区别:
+#   - 使用多阶段生产 Dockerfile (无源码挂载)
+#   - Nginx 反向代理 (HTTPS 终结)
+#   - 仅暴露 Nginx 端口 (80/443)
+#   - 数据库密码由运维注入 (非硬编码)
+# ============================================================================
+
+version: "3.9"
+
+services:
+  # ==========================================================================
+  # NestJS API (生产模式)
+  # ==========================================================================
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    container_name: resumepilot-api
+    restart: always
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@postgres:5432/${DB_NAME}?schema=public
+      - REDIS_URL=redis://redis:6379
+      - JWT_ACCESS_SECRET=${JWT_ACCESS_SECRET}
+      - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - COOKIE_DOMAIN=${COOKIE_DOMAIN}
+      - S3_ENDPOINT=${S3_ENDPOINT:-http://minio:9000}
+      - S3_ACCESS_KEY=${S3_ACCESS_KEY}
+      - S3_SECRET_KEY=${S3_SECRET_KEY}
+      - S3_BUCKET=${S3_BUCKET:-resumepilot-resumes}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+    networks:
+      - resumepilot
+
+  # ==========================================================================
+  # Next.js Web (生产模式)
+  # ==========================================================================
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://api.resumepilot.ai}
+    container_name: resumepilot-web
+    restart: always
+    environment:
+      - NODE_ENV=production
+    depends_on:
+      - api
+    networks:
+      - resumepilot
+
+  # ==========================================================================
+  # BullMQ Worker (异步 AI 分析)
+  # ==========================================================================
+  worker:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    container_name: resumepilot-worker
+    restart: always
+    command: ["sh", "-c", "cd apps/api && node dist/worker.js"]
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@postgres:5432/${DB_NAME}?schema=public&connection_limit=10&pool_timeout=10
+      - REDIS_URL=redis://redis:6379
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - JWT_ACCESS_SECRET=${JWT_ACCESS_SECRET}
+      - S3_ENDPOINT=${S3_ENDPOINT:-http://minio:9000}
+      - S3_ACCESS_KEY=${S3_ACCESS_KEY}
+      - S3_SECRET_KEY=${S3_SECRET_KEY}
+      - S3_BUCKET=${S3_BUCKET:-resumepilot-resumes}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - resumepilot
+    deploy:
+      replicas: 2 # 双副本
+
+  # ==========================================================================
+  # Nginx 反向代理
+  # ==========================================================================
+  nginx:
+    image: nginx:alpine
+    container_name: resumepilot-nginx
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./docker/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./docker/ssl:/etc/nginx/ssl:ro # SSL 证书 (运维手动放置)
+    depends_on:
+      - api
+      - web
+    networks:
+      - resumepilot
+
+networks:
+  resumepilot:
+    driver: bridge

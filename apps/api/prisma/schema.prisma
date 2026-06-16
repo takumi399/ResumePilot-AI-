@@ -1,0 +1,208 @@
+// ============================================================================
+// ResumePilot AI — Prisma Schema
+// ============================================================================
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  directUrl  = env("DIRECT_URL")
+  extensions = [uuidOssp(map: "uuid-ossp"), pgcrypto(map: "pgcrypto"), pgTrgm(map: "pg_trgm")]
+}
+
+// ============================================================================
+// ENUMs
+// ============================================================================
+
+enum UserRole {
+  JOB_SEEKER
+  RECRUITER
+  ADMIN
+  SUPER_ADMIN
+
+  @@map("user_role")
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+  PENDING_VERIFICATION
+  DELETED
+
+  @@map("user_status")
+}
+
+enum FileType {
+  PDF
+  DOCX
+  TXT
+
+  @@map("file_type")
+}
+
+enum ParseStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  NEEDS_REVIEW
+
+  @@map("parse_status")
+}
+
+// ============================================================================
+// 用户模型
+// ============================================================================
+
+model User {
+  id        String    @id @default(uuid()) @db.Uuid
+  email     String    @unique
+  name      String?
+  avatarUrl String?   @map("avatar_url") @db.Text
+
+  // 认证
+  passwordHash      String?   @map("password_hash") @db.Text
+  emailVerifiedAt   DateTime? @map("email_verified_at") @db.Timestamptz()
+  failedLoginAttempts Int     @default(0) @map("failed_login_attempts")
+  lockedUntil       DateTime? @map("locked_until") @db.Timestamptz()
+  passwordChangedAt DateTime? @map("password_changed_at") @db.Timestamptz()
+
+  // MFA
+  mfaEnabled Boolean  @default(false) @map("mfa_enabled")
+  mfaSecret  String?  @map("mfa_secret") @db.Text
+
+  // 角色与状态
+  role   UserRole   @default(JOB_SEEKER)
+  status UserStatus @default(PENDING_VERIFICATION)
+
+  // 偏好
+  preferences Json    @default("{}") @db.JsonB
+
+  // Stripe
+  stripeCustomerId String? @unique @map("stripe_customer_id") @db.Text
+
+  // 审计
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz()
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz()
+  lastLoginAt DateTime? @map("last_login_at") @db.Timestamptz()
+
+  // 关系
+  sessions  Session[]
+  oauthAccounts OAuthAccount[]
+  resumes   Resume[]
+
+  @@map("users")
+}
+
+// ============================================================================
+// 会话模型 (映射到数据库，用于审计追踪)
+// ============================================================================
+
+model Session {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // 刷新令牌的 SHA-256 哈希
+  refreshTokenHash String @map("refresh_token_hash") @db.Text
+  accessTokenJti   String? @map("access_token_jti") @db.Text
+
+  // 设备信息
+  deviceInfo Json  @default("{}") @map("device_info") @db.JsonB
+  ipAddress  String? @map("ip_address") @db.Inet
+  userAgent  String? @map("user_agent") @db.Text
+
+  // 生命周期
+  expiresAt     DateTime  @map("expires_at") @db.Timestamptz()
+  revokedAt     DateTime? @map("revoked_at") @db.Timestamptz()
+  revokedReason String?   @map("revoked_reason") @db.Text
+
+  // 轮换链
+  replacedById  String?  @map("replaced_by") @db.Uuid
+  replacedBy    Session? @relation("SessionChain", fields: [replacedById], references: [id], onDelete: SetNull)
+  replaces      Session[] @relation("SessionChain")
+
+  // 审计
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz()
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([refreshTokenHash])
+  @@index([expiresAt])
+  @@map("user_sessions")
+}
+
+// ============================================================================
+// OAuth 账户
+// ============================================================================
+
+model OAuthAccount {
+  id             String   @id @default(uuid()) @db.Uuid
+  userId         String   @map("user_id") @db.Uuid
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider       String   @db.Text
+  providerUserId String   @map("provider_user_id") @db.Text
+  accessToken    String?  @map("access_token") @db.Text
+  refreshToken   String?  @map("refresh_token") @db.Text
+  tokenExpiresAt DateTime? @map("token_expires_at") @db.Timestamptz()
+  providerData   Json     @default("{}") @map("provider_data") @db.JsonB
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz()
+
+  @@unique([provider, providerUserId])
+  @@map("user_oauth_accounts")
+}
+
+// ============================================================================
+// 简历模型
+// ============================================================================
+
+model Resume {
+  id          String    @id @default(uuid()) @db.Uuid
+  userId      String    @map("user_id") @db.Uuid
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // === 文件信息 ===
+  title            String   @db.Text
+  originalFileName String   @map("original_file_name") @db.Text
+  originalFileType FileType @map("original_file_type")
+  fileSizeBytes    BigInt   @map("file_size_bytes")
+  storageKey       String   @map("storage_key") @db.Text
+  pageCount        Int?
+
+  // === MIME 信息 (安全审计) ===
+  mimeType     String  @map("mime_type") @db.Text
+  fileHash     String  @map("file_hash") @db.Text
+  fileHashAlgo String  @default("sha256") @map("file_hash_algo") @db.Text
+
+  // === 解析结果 ===
+  parsedText      String?     @map("parsed_text") @db.Text
+  structuredData  Json?       @map("structured_data") @db.JsonB
+  parseStatus     ParseStatus @default(PENDING) @map("parse_status")
+  parseError      String?     @map("parse_error") @db.Text
+  parseConfidence Decimal?    @map("parse_confidence") @db.Decimal(3, 2)
+
+  // === 状态标记 ===
+  isPrimary  Boolean @default(false) @map("is_primary")
+  isArchived Boolean @default(false) @map("is_archived")
+  language   String  @default("zh") @db.Text
+
+  // === 审计 ===
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz()
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz()
+  scheduledPurgeAt DateTime? @map("scheduled_purge_at") @db.Timestamptz() // [FIXED #5] 定时清理
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([userId, isPrimary])
+  @@index([parseStatus])
+  @@index([fileHash])
+  @@index([deletedAt])
+  @@map("resumes")
+}

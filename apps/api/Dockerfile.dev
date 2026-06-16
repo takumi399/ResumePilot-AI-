@@ -1,0 +1,23 @@
+# ============================================================================
+# ResumePilot API — 开发模式 Dockerfile (热重载)
+# ============================================================================
+FROM node:22-alpine
+
+RUN corepack enable && corepack prepare pnpm@9 --activate
+RUN apk add --no-cache openssl
+
+WORKDIR /app
+
+COPY pnpm-lock.yaml pnpm-workspace.yaml package.json turbo.json ./
+COPY apps/api/package.json ./apps/api/
+
+RUN pnpm install --frozen-lockfile --filter @resumepilot/api
+
+COPY apps/api/tsconfig.json apps/api/nest-cli.json ./apps/api/
+COPY apps/api/prisma ./apps/api/prisma
+
+RUN cd apps/api && npx prisma generate
+
+EXPOSE 3001 9229
+
+CMD ["sh", "-c", "cd apps/api && npx nest start --watch --debug 0.0.0.0:9229"]

@@ -1,0 +1,14 @@
+**/node_modules
+**/dist
+**/.next
+**/.turbo
+**/.git
+**/.gitignore
+**/.env
+**/.env.*
+!.env.production
+**/README.md
+**/LICENSE
+**/.vscode
+**/coverage
+**/.nyc_output
