@@ -17,8 +17,8 @@ WORKDIR /app
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json turbo.json ./
 COPY apps/api/package.json ./apps/api/
 
-# 安装依赖 (仅 prod，减少体积)
-RUN pnpm install --frozen-lockfile --prod --filter @resumepilot/api
+# 安装依赖 (包含 devDeps，构建时需要 prisma)
+RUN pnpm install --frozen-lockfile --filter @resumepilot/api
 
 # ============================================================================
 # Stage 2: 构建
@@ -66,3 +66,4 @@ EXPOSE 3001
 
 # Prisma migrate + 启动
 CMD ["sh", "-c", "cd apps/api && npx prisma migrate deploy && node dist/main.js"]
+# Note: prisma migrate deploy uses npx because prisma CLI is in devDeps of the installed modules
