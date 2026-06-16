@@ -42,7 +42,7 @@ importers:
         specifier: ^11.0.0
         version: 11.4.4(@nestjs/common@11.1.27(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.27)(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)
       '@prisma/client':
-        specifier: ^6.0.0
+        specifier: 6.19.3
         version: 6.19.3(prisma@6.19.3(typescript@5.9.3))(typescript@5.9.3)
       bcrypt:
         specifier: ^5.1.1
@@ -103,7 +103,7 @@ importers:
         specifier: ^10.0.0
         version: 10.0.0
       prisma:
-        specifier: ^6.0.0
+        specifier: 6.19.3
         version: 6.19.3(typescript@5.9.3)
       typescript:
         specifier: ^5.7.0

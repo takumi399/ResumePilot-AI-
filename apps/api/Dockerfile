@@ -36,7 +36,7 @@ COPY --from=deps /app/apps/api/node_modules ./apps/api/node_modules
 
 # 复制源码并构建
 COPY apps/api ./apps/api
-RUN pnpm --filter @resumepilot/api exec npx prisma generate
+RUN pnpm --filter @resumepilot/api exec pnpm prisma:generate
 RUN pnpm --filter @resumepilot/api build
 
 # ============================================================================
