@@ -27,7 +27,7 @@ ARG NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
 
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json turbo.json ./
-COPY apps/web/package.json next.config.ts tsconfig.json ./
+COPY apps/web/package.json apps/web/next.config.ts apps/web/tsconfig.json ./
 COPY apps/web ./apps/web
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/apps/web/node_modules ./apps/web/node_modules
