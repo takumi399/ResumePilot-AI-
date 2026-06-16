@@ -9,6 +9,7 @@
   <img src="https://img.shields.io/badge/PostgreSQL-16-blue?logo=postgresql" />
   <img src="https://img.shields.io/badge/DeepSeek-V4-536DFE?logo=openai" />
   <img src="https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker" />
+  <img src="https://img.shields.io/badge/license-MIT-green" />
   <img src="https://img.shields.io/github/actions/workflow/status/takumi399/ResumePilot-AI-/ci.yml?label=CI" />
 </p>
 
